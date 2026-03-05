@@ -98,7 +98,27 @@
 
             <div class="space-y-4">
               <div id="yearTabs" class="inline-flex gap-2 tabwrap"></div>
-              <div id="yearContents"></div>
+
+              <!-- input scaffolding -->
+              <div id="yearContents" class="space-y-3">
+                <div class="rounded-2xl border border-zinc-200 p-4 space-y-3">
+                  <div class="flex items-start justify-between gap-3 flex-wrap">
+                    <div class="space-y-1 min-w-[260px]">
+                      <div class="text-sm font-medium">연도 탭 이름</div>
+                      <div class="text-xs text-zinc-600">예: 2023~2024 동절기 (12월=2023년, 1~2월=2024년)</div>
+                      <input id="yearNameInput" class="w-full rounded-xl border border-zinc-300 p-2" />
+                      <div id="seasonRange" class="text-xs text-zinc-600 mt-1"></div>
+                    </div>
+                    <div class="text-right">
+                      <div class="text-xs text-zinc-600">연도 합산 결과</div>
+                      <div id="yearCompare" class="text-sm font-semibold"></div>
+                      <div id="yearP" class="text-xs text-zinc-600 mt-1"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div id="monthBlocks" class="space-y-3"></div>
+              </div>
             </div>
           </div>
 
@@ -117,6 +137,12 @@
 
             <div id="yearSummaryList" class="space-y-3"></div>
           </div>
+
+          <noscript>
+            <div class="p-4 rounded-2xl border border-amber-200 bg-amber-50 text-amber-900 text-sm">
+              이 계산기는 JavaScript가 필요합니다. 브라우저 설정에서 JavaScript를 허용해 주세요.
+            </div>
+          </noscript>
         </div>
       </section>
     </div>
@@ -346,29 +372,46 @@
     });
   }
 
-  function renderYearContents() {
+  function renderMonthBlocks(yIdx) {
+    const y = state.years[yIdx];
     const { perYear } = computeAll();
-    const idx = state.yearTabIdx ?? 0;
-    const y = state.years[idx];
-    const sum = perYear[idx]?.sum;
+    const blocks = $("monthBlocks");
+    blocks.innerHTML = "";
 
-    const container = $("yearContents");
-    if (!y) { container.innerHTML = ""; return; }
-
-    const monthBlocks = MONTHS.map((m) => {
-      const c = perYear[idx]?.perMonth?.[m.key];
+    MONTHS.forEach((m) => {
+      const c = perYear[yIdx]?.perMonth?.[m.key];
       const monthLabel = monthDisplayLabel(y.name, m.key);
       const Qt = y.months[m.key].total;
       const Qp = y.months[m.key].peak;
 
-      const monthResult = c ? `
-        <div class="text-right">
-          <div class="text-xs text-zinc-600">월별 결과</div>
-          <div class="text-sm font-semibold">${renderCompareSentence(c.diff)}</div>
-        </div>` : "";
+      const el = document.createElement("div");
+      el.className = "rounded-2xl border border-zinc-200 p-4 space-y-3";
+      el.innerHTML = `
+        <div class="flex items-center justify-between gap-3 flex-wrap">
+          <div class="space-y-0.5">
+            <div class="text-sm font-semibold">${monthLabel}</div>
+            <div class="text-[11px] text-zinc-600">※ 해당 월 전체 열사용량(Qt) 기준 입력 (Gcal, 소수 1자리)</div>
+          </div>
+          <div class="text-right">
+            <div class="text-xs text-zinc-600">월별 결과</div>
+            <div class="text-sm font-semibold">${renderCompareSentence(c.diff)}</div>
+          </div>
+        </div>
 
-      const monthlyCards = c ? `
-        <div class="grid md:grid-cols-3 gap-2 text-sm mt-3">
+        <div class="grid md:grid-cols-2 gap-3">
+          <div class="space-y-1">
+            <div class="text-xs font-medium">총 사용량(Qt, Gcal)${isExampleState() ? " (예시)" : ""}</div>
+            <input class="w-full rounded-xl border border-zinc-300 p-2" inputmode="decimal" type="number" step="0.1"
+              value="${Qt}" data-yidx="${yIdx}" data-mkey="${m.key}" data-field="total" placeholder="예: 150.0" />
+          </div>
+          <div class="space-y-1">
+            <div class="text-xs font-medium">수요관리시간대 사용량(Qp, 07~10, Gcal)${isExampleState() ? " (예시)" : ""}</div>
+            <input class="w-full rounded-xl border border-zinc-300 p-2" inputmode="decimal" type="number" step="0.1"
+              value="${Qp}" data-yidx="${yIdx}" data-mkey="${m.key}" data-field="peak" placeholder="예: 30.0" />
+          </div>
+        </div>
+
+        <div class="grid md:grid-cols-3 gap-2 text-sm">
           <div class="rounded-xl bg-zinc-100/60 p-3">
             <div class="text-xs text-zinc-600">단일요금제 (VAT별도)</div>
             <div class="font-semibold">${formatNumber(c.CsGross,0)}원</div>
@@ -381,60 +424,12 @@
             <div class="text-xs text-zinc-600">피크 비중(Qp/Qt)</div>
             <div class="font-semibold">${formatNumber(c.p*100,1)}%</div>
           </div>
-        </div>` : "";
-
-      return `
-        <div class="rounded-2xl border border-zinc-200 p-4 space-y-3">
-          <div class="flex items-center justify-between gap-3 flex-wrap">
-            <div class="space-y-0.5">
-              <div class="text-sm font-semibold">${monthLabel}</div>
-              <div class="text-[11px] text-zinc-600">※ 해당 월 전체 열사용량(Qt) 기준 입력 (Gcal, 소수 1자리)</div>
-            </div>
-            ${monthResult}
-          </div>
-
-          <div class="grid md:grid-cols-2 gap-3">
-            <div class="space-y-1">
-              <div class="text-xs font-medium">총 사용량(Qt, Gcal)${isExampleState() ? " (예시)" : ""}</div>
-              <input class="w-full rounded-xl border border-zinc-300 p-2 ${isExampleState() ? "placeholder:text-zinc-400" : ""}"
-                inputmode="decimal" type="number" step="0.1" value="${Qt}"
-                data-yidx="${idx}" data-mkey="${m.key}" data-field="total" placeholder="예: 150.0" />
-            </div>
-            <div class="space-y-1">
-              <div class="text-xs font-medium">수요관리시간대 사용량(Qp, 07~10, Gcal)${isExampleState() ? " (예시)" : ""}</div>
-              <input class="w-full rounded-xl border border-zinc-300 p-2 ${isExampleState() ? "placeholder:text-zinc-400" : ""}"
-                inputmode="decimal" type="number" step="0.1" value="${Qp}"
-                data-yidx="${idx}" data-mkey="${m.key}" data-field="peak" placeholder="예: 30.0" />
-            </div>
-          </div>
-
-          ${monthlyCards}
         </div>
       `;
-    }).join("");
+      blocks.appendChild(el);
+    });
 
-    const topCard = `
-      <div class="rounded-2xl border border-zinc-200 p-4 space-y-3 mb-4">
-        <div class="flex items-start justify-between gap-3 flex-wrap">
-          <div class="space-y-1 min-w-[260px]">
-            <div class="text-sm font-medium">연도 탭 이름</div>
-            <div class="text-xs text-zinc-600">예: 2023~2024 동절기 (12월=2023년, 1~2월=2024년)</div>
-            <input class="w-full rounded-xl border border-zinc-300 p-2" value="${escapeHtml(y.name)}" data-yidx="${idx}" data-yearname="1" />
-            <div class="text-xs text-zinc-600 mt-1">${seasonRangeText(y.name)}</div>
-          </div>
-          ${sum ? `
-            <div class="text-right">
-              <div class="text-xs text-zinc-600">연도 합산 결과</div>
-              ${renderCompareSentence(sum.diff)}
-              <div class="text-xs text-zinc-600 mt-1">피크 비중(Qp/Qt): ${formatNumber(sum.p*100,1)}%</div>
-            </div>` : ""}
-        </div>
-      </div>
-    `;
-
-    container.innerHTML = topCard + `<div class="space-y-3">${monthBlocks}</div>`;
-
-    container.querySelectorAll("input[data-field]").forEach((inp) => {
+    blocks.querySelectorAll("input[data-field]").forEach((inp) => {
       inp.addEventListener("input", (e) => {
         const el = e.target;
         const yidx = Number(el.dataset.yidx);
@@ -446,15 +441,25 @@
         render();
       });
     });
+  }
 
-    container.querySelectorAll("input[data-yearname]").forEach((inp) => {
-      inp.addEventListener("input", (e) => {
-        const el = e.target;
-        const yidx = Number(el.dataset.yidx);
-        state.years[yidx].name = el.value;
-        render();
-      });
-    });
+  function renderYearContents() {
+    const { perYear } = computeAll();
+    const idx = state.yearTabIdx ?? 0;
+    const y = state.years[idx];
+    const sum = perYear[idx]?.sum;
+
+    $("yearNameInput").value = y.name;
+    $("seasonRange").textContent = seasonRangeText(y.name);
+    $("yearCompare").innerHTML = renderCompareSentence(sum.diff);
+    $("yearP").textContent = `피크 비중(Qp/Qt): ${formatNumber(sum.p*100,1)}%`;
+
+    $("yearNameInput").oninput = (e) => {
+      state.years[idx].name = e.target.value;
+      render();
+    };
+
+    renderMonthBlocks(idx);
   }
 
   function renderTotalPanel() {
@@ -486,7 +491,7 @@
         <div class="p-4 space-y-2">
           <div class="flex items-center justify-between gap-3 flex-wrap">
             <div>
-              <div class="text-sm font-semibold">${escapeHtml(y.name)}</div>
+              <div class="text-sm font-semibold">${y.name}</div>
               <div class="text-xs text-zinc-600">피크 비중(Qp/Qt): ${formatNumber(sum.p*100,1)}%</div>
             </div>
             <div class="text-right">${renderCompareSentence(sum.diff)}</div>
